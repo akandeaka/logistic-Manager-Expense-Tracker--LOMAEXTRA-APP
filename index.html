@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Logistics"/>
+<title>Logistics Tracker</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f172a; --card: #1e293b; --card2: #334155;
+    --text: #e2e8f0; --muted: #94a3b8;
+    --accent: #38bdf8; --green: #22c55e; --red: #ef4444; --yellow: #eab308;
+    --orange: #f97316; --border: #334155;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+    padding: 12px; max-width: 1200px; margin: 0 auto;
+  }
+  h1 { font-size: 1.4rem; margin-bottom: 4px; }
+  h2 { font-size: 1.1rem; margin: 16px 0 8px; color: var(--accent); }
+  .subtitle { color: var(--muted); font-size: 0.85rem; margin-bottom: 12px; }
+
+  .tabs { display: flex; gap: 4px; overflow-x: auto; margin-bottom: 12px; padding-bottom: 4px; }
+  .tab {
+    padding: 8px 14px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; white-space: nowrap; font-size: 0.85rem;
+    color: var(--text);
+  }
+  .tab.active { background: var(--accent); color: #0f172a; font-weight: 600; border-color: var(--accent); }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px; margin-bottom: 12px;
+  }
+  .grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+
+  label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  input, select, textarea {
+    width: 100%; padding: 9px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 0.9rem; font-family: inherit;
+  }
+  input:focus, select:focus { outline: 2px solid var(--accent); }
+
+  button {
+    padding: 10px 16px; border-radius: 6px; border: none; cursor: pointer;
+    font-size: 0.9rem; font-weight: 600; font-family: inherit;
+  }
+  .btn-primary { background: var(--accent); color: #0f172a; }
+  .btn-primary:hover { background: #0ea5e9; }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-small { padding: 4px 8px; font-size: 0.75rem; }
+  .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 8px; }
+  th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; }
+  .amt { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .scroll { overflow-x: auto; }
+
+  .stat {
+    background: var(--card2); border-radius: 8px; padding: 10px 12px;
+  }
+  .stat .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat .value { font-size: 1.15rem; font-weight: 700; margin-top: 2px; }
+
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1; min-width: 120px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+  .badge.paid { background: rgba(34,197,94,0.2); color: var(--green); }
+  .badge.part { background: rgba(234,179,8,0.2); color: var(--yellow); }
+  .badge.unpaid { background: rgba(239,68,68,0.2); color: var(--red); }
+  .badge.import { background: rgba(56,189,248,0.2); color: var(--accent); }
+  .badge.export { background: rgba(249,115,22,0.2); color: var(--orange); }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--accent); color: #0f172a; padding: 10px 20px;
+    border-radius: 8px; font-weight: 600; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none; z-index: 100;
+  }
+  .toast.show { opacity: 1; }
+  canvas { max-height: 280px; }
+  .muted { color: var(--muted); font-size: 0.8rem; }
+  .empty { text-align: center; color: var(--muted); padding: 20px; font-size: 0.85rem; }
+  .chip {
+    display: inline-block; padding: 3px 8px; background: var(--card2);
+    border-radius: 6px; font-size: 0.75rem; margin: 2px;
+  }
+</style>
+</head>
+<body>
+
+<h1>📦 Logistics Tracker</h1>
+<p class="subtitle">Clearing • Import • Export • Customer Payments</p>
+
+<div class="tabs">
+  <div class="tab active" data-tab="dashboard">📊 Dashboard</div>
+  <div class="tab" data-tab="jobs">🧾 Jobs</div>
+  <div class="tab" data-tab="customers">👥 Customers</div>
+  <div class="tab" data-tab="data">⚙️ Data</div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dashboard" class="panel active">
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Period</label>
+        <select id="dashPeriod">
+          <option value="week">This Week</option>
+          <option value="month" selected>This Month</option>
+          <option value="year">This Year</option>
+          <option value="custom">Custom Range</option>
+        </select>
+      </div>
+      <div id="customRangeStart" style="display:none">
+        <label>From</label>
+        <input type="date" id="dashStart" />
+      </div>
+      <div id="customRangeEnd" style="display:none">
+        <label>To</label>
+        <input type="date" id="dashEnd" />
+      </div>
+    </div>
+  </div>
+
+  <h2 id="dashTitle">This Month Summary</h2>
+
+  <div class="grid" id="dashStats"></div>
+
+  <h2>By Direction</h2>
+  <div class="grid" id="directionStats"></div>
+
+  <h2>Revenue vs Cost vs Profit</h2>
+  <div class="card"><canvas id="revChart"></canvas></div>
+
+  <h2>Profit Trend</h2>
+  <div class="card"><canvas id="trendChart"></canvas></div>
+
+  <h2>🏆 Top Customers</h2>
+  <div class="card scroll">
+    <table id="topCustomersTable">
+      <thead><tr>
+        <th>#</th><th>Customer</th><th class="amt">Jobs</th>
+        <th class="amt">Billed</th><th class="amt">Paid</th>
+        <th class="amt">Owed</th><th>Status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h2>⚠️ Outstanding Payments</h2>
+  <div class="card scroll">
+    <table id="outstandingTable">
+      <thead><tr>
+        <th>Date</th><th>Customer</th><th>Goods</th>
+        <th class="amt">Charged</th><th class="amt">Paid</th>
+        <th class="amt">Owed</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <h2>💡 Insights</h2>
+  <div class="card" id="insights"></div>
+</div>
+
+<!-- ================= JOBS ================= -->
+<div id="jobs" class="panel">
+  <div class="card">
+    <h2>Add New Job / Shipment</h2>
+
+    <h3 style="color:var(--muted);font-size:0.8rem;margin-bottom:6px">1. Customer & Service</h3>
+    <div class="row">
+      <div><label>Date</label><input type="date" id="jDate" /></div>
+      <div>
+        <label>Customer</label>
+        <input type="text" id="jCustomer" list="customerList" placeholder="e.g. Customer A" />
+        <datalist id="customerList"></datalist>
+      </div>
+      <div>
+        <label>Direction</label>
+        <select id="jDirection">
+          <option>Export</option>
+          <option>Import</option>
+        </select>
+      </div>
+      <div><label>Goods Description</label><input type="text" id="jGoods" placeholder="e.g. 10kg groundnut" /></div>
+      <div><label>Origin / Destination</label><input type="text" id="jDest" placeholder="e.g. London" /></div>
+    </div>
+
+    <h3 style="color:var(--muted);font-size:0.8rem;margin:14px 0 6px">2. What You Charged</h3>
+    <div class="row">
+      <div>
+        <label>Currency</label>
+        <select id="jCurrency">
+          <option value="NGN">₦ NGN</option>
+          <option value="USD">$ USD</option>
+          <option value="GBP">£ GBP</option>
+          <option value="EUR">€ EUR</option>
+          <option value="CNY">¥ CNY</option>
+        </select>
+      </div>
+      <div><label>Amount Charged</label><input type="number" id="jCharged" step="0.01" placeholder="0" /></div>
+      <div id="rateField" style="display:none"><label>Exchange Rate to ₦</label><input type="number" id="jRate" step="0.01" placeholder="e.g. 1600" /></div>
+      <div><label>Amount in ₦ (auto)</label><input type="text" id="jChargedNGN" readonly placeholder="0.00" /></div>
+    </div>
+
+    <h3 style="color:var(--muted);font-size:0.8rem;margin:14px 0 6px">3. Payment Status</h3>
+    <div class="row">
+      <div>
+        <label>Status</label>
+        <select id="jPayStatus">
+          <option>Paid in Full</option>
+          <option>Part Payment</option>
+          <option>Unpaid</option>
+        </select>
+      </div>
+      <div><label>Amount Paid (₦)</label><input type="number" id="jPaid" step="0.01" placeholder="0" /></div>
+      <div><label>Balance Owed (auto)</label><input type="text" id="jBalance" readonly placeholder="0.00" /></div>
+      <div>
+        <label>Payment Method</label>
+        <select id="jPayMethod">
+          <option>Cash</option>
+          <option>Bank Transfer</option>
+          <option>Foreign Wire</option>
+          <option>Cheque</option>
+          <option>Other</option>
+        </select>
+      </div>
+    </div>
+
+    <h3 style="color:var(--muted);font-size:0.8rem;margin:14px 0 6px">4. Your Expenses (₦)</h3>
+    <div class="row">
+      <div><label>Transport</label><input type="number" id="jTransport" step="0.01" placeholder="0" /></div>
+      <div><label>Customs / Duty</label><input type="number" id="jDuty" step="0.01" placeholder="0" /></div>
+      <div><label>Agent Fee</label><input type="number" id="jAgent" step="0.01" placeholder="0" /></div>
+      <div><label>Documentation</label><input type="number" id="jDocs" step="0.01" placeholder="0" /></div>
+      <div><label>Miscellaneous</label><input type="number" id="jMisc" step="0.01" placeholder="0" /></div>
+      <div><label>Other</label><input type="number" id="jOther" step="0.01" placeholder="0" /></div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Notes</label><input type="text" id="jNotes" placeholder="optional" /></div>
+    </div>
+
+    <div class="actions">
+      <button class="btn-primary" onclick="addJob()">💾 Save Job</button>
+      <button class="btn-ghost" onclick="clearJobForm()">Clear</button>
+    </div>
+  </div>
+
+  <h2>All Jobs</h2>
+  <div class="card">
+    <div class="row">
+      <div>
+        <label>Filter by status</label>
+        <select id="jobFilter" onchange="renderJobs()">
+          <option value="all">All</option>
+          <option value="Paid in Full">Paid</option>
+          <option value="Part Payment">Part Payment</option>
+          <option value="Unpaid">Unpaid</option>
+        </select>
+      </div>
+      <div>
+        <label>Search customer / goods</label>
+        <input type="text" id="jobSearch" oninput="renderJobs()" placeholder="search..." />
+      </div>
+    </div>
+  </div>
+  <div class="card scroll">
+    <table id="jobsTable">
+      <thead><tr>
+        <th>Date</th><th>Customer</th><th>Dir</th><th>Goods</th>
+        <th class="amt">Charged</th><th class="amt">Paid</th>
+        <th class="amt">Owed</th><th class="amt">Expenses</th>
+        <th class="amt">Profit</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= CUSTOMERS ================= -->
+<div id="customers" class="panel">
+  <h2>Customer Summary (All Time)</h2>
+  <div class="card scroll">
+    <table id="customersTable">
+      <thead><tr>
+        <th>Customer</th><th class="amt">Jobs</th>
+        <th class="amt">Total Billed</th><th class="amt">Total Paid</th>
+        <th class="amt">Outstanding</th><th>Last Job</th><th>Status</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ================= DATA ================= -->
+<div id="data" class="panel">
+  <div class="card">
+    <h2>Backup & Restore</h2>
+    <p class="muted">Data is stored only on this device. Back up weekly.</p>
+    <div class="actions">
+      <button class="btn-primary" onclick="exportData()">⬇️ Export JSON Backup</button>
+      <button class="btn-ghost" onclick="document.getElementById('importFile').click()">⬆️ Import Backup</button>
+      <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" />
+      <button class="btn-danger" onclick="clearAll()">🗑️ Delete All Data</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Quick Stats</h2>
+    <div id="dataStats" class="grid"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   DATA
+============================================================ */
+const KEY = 'logistics_v1';
+let db = { jobs: [] };
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) db = JSON.parse(raw);
+  } catch(e) { console.warn(e); }
+  if (!db.jobs) db.jobs = [];
+}
+function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function today() { return new Date().toISOString().slice(0,10); }
+
+function fmt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtInt(n) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-NG', { maximumFractionDigits: 0 });
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+/* ============================================================
+   TABS
+============================================================ */
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'dashboard') renderDashboard();
+    if (tab.dataset.tab === 'customers') renderCustomers();
+    if (tab.dataset.tab === 'data') renderDataStats();
+  });
+});
+
+/* ============================================================
+   JOB FORM
+============================================================ */
+document.getElementById('jCurrency').addEventListener('change', e => {
+  document.getElementById('rateField').style.display = e.target.value === 'NGN' ? 'none' : 'block';
+  recalcCharged();
+});
+document.getElementById('jCharged').addEventListener('input', recalcCharged);
+document.getElementById('jRate').addEventListener('input', recalcCharged);
+document.getElementById('jPaid').addEventListener('input', recalcBalance);
+
+function recalcCharged() {
+  const cur = document.getElementById('jCurrency').value;
+  const amt = parseFloat(document.getElementById('jCharged').value) || 0;
+  const rate = parseFloat(document.getElementById('jRate').value) || 1;
+  const ngn = cur === 'NGN' ? amt : amt * rate;
+  document.getElementById('jChargedNGN').value = ngn ? fmt(ngn) : '';
+  recalcBalance();
+}
+function recalcBalance() {
+  const chargedNGN = parseNumber(document.getElementById('jChargedNGN').value);
+  const paid = parseFloat(document.getElementById('jPaid').value) || 0;
+  const balance = chargedNGN - paid;
+  document.getElementById('jBalance').value = chargedNGN ? fmt(balance) : '';
+}
+function parseNumber(s) {
+  if (!s) return 0;
+  return parseFloat(String(s).replace(/,/g, '')) || 0;
+}
+
+function clearJobForm() {
+  ['jCustomer','jGoods','jDest','jCharged','jRate','jChargedNGN','jPaid','jBalance',
+   'jTransport','jDuty','jAgent','jDocs','jMisc','jOther','jNotes']
+   .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('jDate').value = today();
+  document.getElementById('jCurrency').value = 'NGN';
+  document.getElementById('rateField').style.display = 'none';
+  document.getElementById('jDirection').value = 'Export';
+  document.getElementById('jPayStatus').value = 'Paid in Full';
+}
+
+function addJob() {
+  const date = document.getElementById('jDate').value || today();
+  const customer = document.getElementById('jCustomer').value.trim();
+  const direction = document.getElementById('jDirection').value;
+  const goods = document.getElementById('jGoods').value.trim();
+  const dest = document.getElementById('jDest').value.trim();
+  const currency = document.getElementById('jCurrency').value;
+  const chargedRaw = parseFloat(document.getElementById('jCharged').value) || 0;
+  const rate = parseFloat(document.getElementById('jRate').value) || 1;
+  const chargedNGN = currency === 'NGN' ? chargedRaw : chargedRaw * rate;
+  const payStatus = document.getElementById('jPayStatus').value;
+  const paid = parseFloat(document.getElementById('jPaid').value) || 0;
+  const payMethod = document.getElementById('jPayMethod').value;
+
+  const expenses = {
+    transport: parseFloat(document.getElementById('jTransport').value) || 0,
+    duty: parseFloat(document.getElementById('jDuty').value) || 0,
+    agent: parseFloat(document.getElementById('jAgent').value) || 0,
+    docs: parseFloat(document.getElementById('jDocs').value) || 0,
+    misc: parseFloat(document.getElementById('jMisc').value) || 0,
+    other: parseFloat(document.getElementById('jOther').value) || 0
+  };
+  const totalExpenses = Object.values(expenses).reduce((a,b) => a+b, 0);
+  const profit = chargedNGN - totalExpenses;
+  const owed = chargedNGN - paid;
+
+  if (!customer) return toast('Enter customer name');
+  if (!chargedRaw) return toast('Enter amount charged');
+
+  db.jobs.push({
+    id: uid(), date, customer, direction, goods, dest,
+    currency, chargedRaw, rate, chargedNGN,
+    payStatus, paid, owed, payMethod,
+    expenses, totalExpenses, profit,
+    notes: document.getElementById('jNotes').value.trim()
+  });
+  save(); renderJobs(); renderCustomers(); renderDashboard();
+  clearJobForm();
+  toast('Job saved');
+}
+
+function deleteJob(id) {
+  if (!confirm('Delete this job?')) return;
+  db.jobs = db.jobs.filter(j => j.id !== id);
+  save(); renderJobs(); renderCustomers(); renderDashboard();
+  toast('Job deleted');
+}
+
+function renderJobs() {
+  const tb = document.querySelector('#jobsTable tbody');
+  const filter = document.getElementById('jobFilter').value;
+  const search = document.getElementById('jobSearch').value.toLowerCase();
+  tb.innerHTML = '';
+
+  let rows = [...db.jobs].sort((a,b) => b.date.localeCompare(a.date));
+  if (filter !== 'all') rows = rows.filter(j => j.payStatus === filter);
+  if (search) rows = rows.filter(j =>
+    j.customer.toLowerCase().includes(search) ||
+    (j.goods || '').toLowerCase().includes(search)
+  );
+
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="11" class="empty">No jobs yet</td></tr>';
+    return;
+  }
+  rows.forEach(j => {
+    const statusClass = j.payStatus === 'Paid in Full' ? 'paid' :
+                        j.payStatus === 'Part Payment' ? 'part' : 'unpaid';
+    const dirClass = j.direction.toLowerCase();
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${j.date}</td>
+      <td>${j.customer}</td>
+      <td><span class="badge ${dirClass}">${j.direction}</span></td>
+      <td>${j.goods || '—'}</td>
+      <td class="amt">${fmtInt(j.chargedNGN)}</td>
+      <td class="amt">${fmtInt(j.paid)}</td>
+      <td class="amt ${j.owed > 0 ? 'neg' : ''}">${fmtInt(j.owed)}</td>
+      <td class="amt">${fmtInt(j.totalExpenses)}</td>
+      <td class="amt ${j.profit >= 0 ? 'pos' : 'neg'}">${fmtInt(j.profit)}</td>
+      <td><span class="badge ${statusClass}">${j.payStatus}</span></td>
+      <td><button class="btn-danger btn-small" onclick="deleteJob('${j.id}')">✕</button></td>
+    `;
+    tb.appendChild(tr);
+  });
+
+  // Update datalist with customer names
+  const dl = document.getElementById('customerList');
+  dl.innerHTML = [...new Set(db.jobs.map(j => j.customer))]
+    .map(c => `<option value="${c}">`).join('');
+}
+
+/* ============================================================
+   DATE RANGES
+============================================================ */
+function periodRange(period) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  if (period === 'week') {
+    const day = now.getDay();
+    const monday = new Date(now); monday.setDate(now.getDate() - ((day+6)%7));
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    return [monday.toISOString().slice(0,10), sunday.toISOString().slice(0,10)];
+  }
+  if (period === 'month') {
+    const start = new Date(y, m, 1).toISOString().slice(0,10);
+    const end = new Date(y, m+1, 0).toISOString().slice(0,10);
+    return [start, end];
+  }
+  if (period === 'year') {
+    return [`${y}-01-01`, `${y}-12-31`];
+  }
+  return null;
+}
+function jobsInRange(start, end) {
+  return db.jobs.filter(j => j.date >= start && j.date <= end);
+}
+
+/* ============================================================
+   AGGREGATION
+============================================================ */
+function aggregate(jobs) {
+  const billed = jobs.reduce((s,j) => s + j.chargedNGN, 0);
+  const paid = jobs.reduce((s,j) => s + j.paid, 0);
+  const owed = jobs.reduce((s,j) => s + j.owed, 0);
+  const expenses = jobs.reduce((s,j) => s + j.totalExpenses, 0);
+  const profit = jobs.reduce((s,j) => s + j.profit, 0);
+  const exportJobs = jobs.filter(j => j.direction === 'Export');
+  const importJobs = jobs.filter(j => j.direction === 'Import');
+  return {
+    count: jobs.length,
+    billed, paid, owed, expenses, profit,
+    exportCount: exportJobs.length,
+    exportBilled: exportJobs.reduce((s,j) => s + j.chargedNGN, 0),
+    exportProfit: exportJobs.reduce((s,j) => s + j.profit, 0),
+    importCount: importJobs.length,
+    importBilled: importJobs.reduce((s,j) => s + j.chargedNGN, 0),
+    importProfit: importJobs.reduce((s,j) => s + j.profit, 0)
+  };
+}
+
+/* ============================================================
+   DASHBOARD
+============================================================ */
+let revChart, trendChart;
+
+document.getElementById('dashPeriod').addEventListener('change', e => {
+  const custom = e.target.value === 'custom';
+  document.getElementById('customRangeStart').style.display = custom ? 'block' : 'none';
+  document.getElementById('customRangeEnd').style.display = custom ? 'block' : 'none';
+  renderDashboard();
+});
+document.getElementById('dashStart').addEventListener('change', renderDashboard);
+document.getElementById('dashEnd').addEventListener('change', renderDashboard);
+
+function getActiveRange() {
+  const period = document.getElementById('dashPeriod').value;
+  if (period === 'custom') {
+    const start = document.getElementById('dashStart').value;
+    const end = document.getElementById('dashEnd').value;
+    if (start && end) return [start, end];
+    return periodRange('month');
+  }
+  return periodRange(period);
+}
+
+function renderDashboard() {
+  const [start, end] = getActiveRange();
+  const periodLabel = document.getElementById('dashPeriod').selectedOptions[0].text;
+  document.getElementById('dashTitle').textContent = `${periodLabel} — ${start} to ${end}`;
+
+  const jobs = jobsInRange(start, end);
+  const a = aggregate(jobs);
+
+  document.getElementById('dashStats').innerHTML = `
+    <div class="stat"><div class="label">Jobs / Shipments</div><div class="value">${a.count}</div></div>
+    <div class="stat"><div class="label">Total Billed</div><div class="value">₦${fmtInt(a.billed)}</div></div>
+    <div class="stat"><div class="label">Total Received</div><div class="value pos">₦${fmtInt(a.paid)}</div></div>
+    <div class="stat"><div class="label">Outstanding</div><div class="value neg">₦${fmtInt(a.owed)}</div></div>
+    <div class="stat"><div class="label">Expenses</div><div class="value neg">₦${fmtInt(a.expenses)}</div></div>
+    <div class="stat"><div class="label">Net Profit</div><div class="value ${a.profit >= 0 ? 'pos' : 'neg'}">₦${fmtInt(a.profit)}</div></div>
+  `;
+
+  document.getElementById('directionStats').innerHTML = `
+    <div class="stat">
+      <div class="label">📤 Export Jobs</div>
+      <div class="value">${a.exportCount}</div>
+      <div class="muted">Billed ₦${fmtInt(a.exportBilled)} • Profit ₦${fmtInt(a.exportProfit)}</div>
+    </div>
+    <div class="stat">
+      <div class="label">📥 Import Jobs</div>
+      <div class="value">${a.importCount}</div>
+      <div class="muted">Billed ₦${fmtInt(a.importBilled)} • Profit ₦${fmtInt(a.importProfit)}</div>
+    </div>
+  `;
+
+  // Revenue vs Cost vs Profit chart
+  const ctx1 = document.getElementById('revChart').getContext('2d');
+  if (revChart) revChart.destroy();
+  revChart = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: ['Billed', 'Received', 'Expenses', 'Profit'],
+      datasets: [{
+        data: [a.billed, a.paid, a.expenses, a.profit],
+        backgroundColor: ['#38bdf8', '#22c55e', '#ef4444', '#eab308']
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Profit trend (daily, within range)
+  const dailyMap = {};
+  jobs.forEach(j => {
+    dailyMap[j.date] = (dailyMap[j.date] || 0) + j.profit;
+  });
+  const dates = Object.keys(dailyMap).sort();
+  const ctx2 = document.getElementById('trendChart').getContext('2d');
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx2, {
+    type: 'line',
+    data: {
+      labels: dates.length ? dates.map(d => d.slice(5)) : ['No data'],
+      datasets: [{
+        label: 'Daily Profit (₦)',
+        data: dates.length ? dates.map(d => dailyMap[d]) : [0],
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56,189,248,0.15)',
+        fill: true, tension: 0.3, pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Top customers
+  const byCustomer = {};
+  jobs.forEach(j => {
+    if (!byCustomer[j.customer]) byCustomer[j.customer] = { jobs: 0, billed: 0, paid: 0, owed: 0 };
+    byCustomer[j.customer].jobs++;
+    byCustomer[j.customer].billed += j.chargedNGN;
+    byCustomer[j.customer].paid += j.paid;
+    byCustomer[j.customer].owed += j.owed;
+  });
+  const sorted = Object.entries(byCustomer).sort((a,b) => b[1].billed - a[1].billed).slice(0, 10);
+  const topTb = document.querySelector('#topCustomersTable tbody');
+  if (!sorted.length) {
+    topTb.innerHTML = '<tr><td colspan="7" class="empty">No jobs in this period</td></tr>';
+  } else {
+    topTb.innerHTML = sorted.map(([name, d], i) => {
+      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+      const status = d.owed === 0 ? '<span class="badge paid">Paid</span>'
+                    : d.paid === 0 ? '<span class="badge unpaid">Unpaid</span>'
+                    : '<span class="badge part">Part</span>';
+      return `<tr>
+        <td>${medal}</td>
+        <td>${name}</td>
+        <td class="amt">${d.jobs}</td>
+        <td class="amt">${fmtInt(d.billed)}</td>
+        <td class="amt">${fmtInt(d.paid)}</td>
+        <td class="amt ${d.owed > 0 ? 'neg' : ''}">${fmtInt(d.owed)}</td>
+        <td>${status}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Outstanding payments
+  const outstanding = jobs.filter(j => j.owed > 0).sort((a,b) => b.owed - a.owed);
+  const outTb = document.querySelector('#outstandingTable tbody');
+  if (!outstanding.length) {
+    outTb.innerHTML = '<tr><td colspan="6" class="empty">Nothing outstanding 🎉</td></tr>';
+  } else {
+    outTb.innerHTML = outstanding.map(j => `<tr>
+      <td>${j.date}</td>
+      <td>${j.customer}</td>
+      <td>${j.goods || '—'}</td>
+      <td class="amt">${fmtInt(j.chargedNGN)}</td>
+      <td class="amt">${fmtInt(j.paid)}</td>
+      <td class="amt neg">${fmtInt(j.owed)}</td>
+    </tr>`).join('');
+  }
+
+  // Insights
+  const insights = [];
+  if (sorted.length) insights.push(`🏆 Top customer: <strong>${sorted[0][0]}</strong> (₦${fmtInt(sorted[0][1].billed)} billed)`);
+  if (a.owed > 0) insights.push(`⚠️ ₦${fmtInt(a.owed)} outstanding across ${outstanding.length} job(s)`);
+  if (a.exportCount && a.importCount) {
+    const better = a.exportProfit > a.importProfit ? 'Export' : 'Import';
+    insights.push(`📈 More profitable direction: <strong>${better}</strong>`);
+  }
+  if (a.billed && a.profit) {
+    const margin = (a.profit / a.billed * 100).toFixed(1);
+    insights.push(`💹 Profit margin: <strong>${margin}%</strong>`);
+  }
+  if (a.count === 0) insights.push('No jobs recorded in this period yet.');
+  document.getElementById('insights').innerHTML = insights.map(i => `<p style="margin:6px 0">${i}</p>`).join('');
+}
+
+/* ============================================================
+   CUSTOMERS TAB
+============================================================ */
+function renderCustomers() {
+  const map = {};
+  db.jobs.forEach(j => {
+    if (!map[j.customer]) map[j.customer] = { jobs: 0, billed: 0, paid: 0, owed: 0, lastDate: '' };
+    map[j.customer].jobs++;
+    map[j.customer].billed += j.chargedNGN;
+    map[j.customer].paid += j.paid;
+    map[j.customer].owed += j.owed;
+    if (j.date > map[j.customer].lastDate) map[j.customer].lastDate = j.date;
+  });
+  const sorted = Object.entries(map).sort((a,b) => b[1].billed - a[1].billed);
+  const tb = document.querySelector('#customersTable tbody');
+  if (!sorted.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="empty">No customers yet</td></tr>';
+    return;
+  }
+  tb.innerHTML = sorted.map(([name, d]) => {
+    const status = d.owed === 0 ? '<span class="badge paid">Paid</span>'
+                  : d.paid === 0 ? '<span class="badge unpaid">Unpaid</span>'
+                  : '<span class="badge part">Part</span>';
+    return `<tr>
+      <td>${name}</td>
+      <td class="amt">${d.jobs}</td>
+      <td class="amt">${fmtInt(d.billed)}</td>
+      <td class="amt">${fmtInt(d.paid)}</td>
+      <td class="amt ${d.owed > 0 ? 'neg' : ''}">${fmtInt(d.owed)}</td>
+      <td>${d.lastDate}</td>
+      <td>${status}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ============================================================
+   DATA
+============================================================ */
+function renderDataStats() {
+  const billed = db.jobs.reduce((s,j) => s + j.chargedNGN, 0);
+  const paid = db.jobs.reduce((s,j) => s + j.paid, 0);
+  const owed = db.jobs.reduce((s,j) => s + j.owed, 0);
+  document.getElementById('dataStats').innerHTML = `
+    <div class="stat"><div class="label">Total Jobs</div><div class="value">${db.jobs.length}</div></div>
+    <div class="stat"><div class="label">Total Billed</div><div class="value">₦${fmtInt(billed)}</div></div>
+    <div class="stat"><div class="label">Total Received</div><div class="value pos">₦${fmtInt(paid)}</div></div>
+    <div class="stat"><div class="label">Total Outstanding</div><div class="value neg">₦${fmtInt(owed)}</div></div>
+  `;
+}
+function exportData() {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `logistics-backup-${today()}.json`; a.click();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+function importData(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.jobs) throw new Error('Invalid backup');
+      if (!confirm('This will overwrite current data. Continue?')) return;
+      db = data; save(); renderAll();
+      toast('Backup restored');
+    } catch(err) { alert('Invalid backup file'); }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+function clearAll() {
+  if (!confirm('Delete ALL data permanently?')) return;
+  if (!confirm('Are you absolutely sure?')) return;
+  db = { jobs: [] }; save(); renderAll();
+  toast('All data cleared');
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+function renderAll() {
+  renderJobs(); renderCustomers(); renderDashboard(); renderDataStats();
+}
+function init() {
+  load();
+  document.getElementById('jDate').value = today();
+  document.getElementById('dashStart').value = today().slice(0,8) + '01';
+  document.getElementById('dashEnd').value = today();
+  renderAll();
+}
+init();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW fail', e));
+  });
+}
+</script>
+</body>
+</html>
